@@ -530,7 +530,10 @@ def _git_cache_controls_are_current(
     control_paths = _git_cache_control_paths(ls_files) + _git_cache_control_paths(ignored_controls)
     for file_path in _local_git_paths_outside_children(control_paths, child_roots):
         global_path = _join_git_path(source_rel, file_path)
-        if (display_root / global_path).stat().st_mtime > write_time:
+        try:
+            if (display_root / global_path).stat().st_mtime > write_time:
+                return False
+        except OSError:
             return False
     return True
 

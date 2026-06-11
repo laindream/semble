@@ -199,8 +199,9 @@ class LmdbChunkStore:
         with self.env.begin(buffers=True) as txn:
             for chunk_id in chunk_ids:
                 data = txn.get(_int_key(chunk_id), db=self.chunks_db)
-                if data is not None:
-                    chunks.append(_deserialize_chunk(data))
+                if data is None:
+                    raise FileNotFoundError(f"Index chunk store is missing chunk payload for id {chunk_id}")
+                chunks.append(_deserialize_chunk(data))
         return chunks
 
     def delete_chunks(self, chunk_ids: Sequence[int]) -> None:

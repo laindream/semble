@@ -1,7 +1,7 @@
 import shutil
 import tempfile
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Protocol
@@ -307,6 +307,8 @@ class TantivySparseIndex:
             store.close()
         if loaded is None:
             raise FileNotFoundError(f"Sparse index is missing chunk payload for id {chunk_id}")
+        if loaded.chunk_id != chunk_id:
+            loaded = replace(loaded, chunk_id=chunk_id)
         return loaded
 
     def update_chunks(
@@ -394,6 +396,10 @@ class Bm25sSparseIndex:
             SearchResult(chunk=self.chunks[index], score=score)
             for index, score in self._search_positions(query, top_k, filter_spec)
         ]
+
+    def save(self, path: Path) -> None:
+        """Persist the wrapped bm25s index."""
+        self.bm25_index.save(path)
 
 
 def _sort_top_k(arr: npt.NDArray, top_k: int) -> npt.NDArray[np.int_]:

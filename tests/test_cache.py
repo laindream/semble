@@ -13,6 +13,7 @@ import pytest
 import semble.cache as cache_module
 from semble.cache import (
     _get_valid_user_cache_dir,
+    _git_cache_controls_are_current,
     _git_cache_heads_match,
     _git_cache_is_current,
     _linux_cache_dir,
@@ -522,6 +523,11 @@ def test_get_validated_cache_cached_untracked_ignore_file_skips_full_walk(tmp_pa
             result = get_validated_cache(str(repo), "my/model", [ContentType.CODE])
 
     assert result == index_path
+
+
+def test_git_cache_controls_missing_file_invalidates_cache(tmp_path: Path) -> None:
+    """Missing git control files should invalidate cache instead of crashing validation."""
+    assert _git_cache_controls_are_current(tmp_path, "", [], 0.0, b".gitignore\0", b"") is False
 
 
 def test_get_validated_cache_cached_untracked_file_skips_full_walk(tmp_path: Path) -> None:

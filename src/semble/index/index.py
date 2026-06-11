@@ -177,10 +177,10 @@ def _load_seed_chunks(persistence_paths: PersistencePath, chunk_ids: list[int]) 
     store = LmdbChunkStore.open(persistence_paths.chunk_store, readonly=True)
     try:
         chunks = store.get_chunks(chunk_ids)
+    except FileNotFoundError:
+        return None
     finally:
         store.close()
-    if len(chunks) != len(chunk_ids):
-        return None
     return chunks
 
 
@@ -995,8 +995,6 @@ class SembleIndex:
                     chunks = store.get_chunks(ids)
                 finally:
                     store.close()
-                if len(chunks) != len(ids):
-                    raise FileNotFoundError("Index chunk store is missing chunk payloads")
             semantic_index = StableIdSemanticBackend(raw_semantic_index, ids)
         else:
             semantic_index = raw_semantic_index

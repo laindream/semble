@@ -642,7 +642,7 @@ def test_load_from_disk_fails_loud_when_lmdb_chunk_payload_is_missing(tmp_path: 
         patch("semble.index.index.BM25.load", return_value=MagicMock()),
         patch("semble.index.index.SelectableBasicBackend.load", return_value=MagicMock()),
         patch("semble.index.index.load_model", return_value=(mock_model, "mock-model")),
-        pytest.raises(FileNotFoundError, match="missing chunk payloads"),
+        pytest.raises(FileNotFoundError, match="missing chunk payload for id 1"),
     ):
         SembleIndex.load_from_disk(index_path)
 

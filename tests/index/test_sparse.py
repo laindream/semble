@@ -4,8 +4,9 @@ from unittest.mock import Mock, patch
 
 import bm25s
 import numpy as np
+import orjson
 
-from semble.index.chunk_store import LmdbChunkStore
+from semble.index.chunk_store import LmdbChunkStore, _int_key
 from semble.index.sparse import (
     Bm25sSparseIndex,
     TantivySparseIndex,
@@ -44,6 +45,16 @@ def test_tantivy_sparse_order_matches_bm25_for_enriched_body() -> None:
     actual = [result.chunk for result in TantivySparseIndex.from_chunks(chunks).search("needle", 3)]
 
     assert actual == expected
+
+
+def test_bm25s_sparse_index_save_delegates_to_wrapped_index(tmp_path: Path) -> None:
+    """The bm25s adapter should satisfy the SparseIndex persistence protocol."""
+    bm25_index = Mock()
+    sparse_index = Bm25sSparseIndex(bm25_index, [])
+
+    sparse_index.save(tmp_path / "bm25")
+
+    bm25_index.save.assert_called_once_with(tmp_path / "bm25")
 
 
 def test_tantivy_sparse_index_searches_content_and_path_terms(tmp_path: Path) -> None:
@@ -196,6 +207,25 @@ def test_tantivy_sparse_index_loads_hit_chunks_from_lmdb_without_bulk_chunk_list
         results = loaded.search("authenticate token", top_k=1)
 
     assert [result.chunk for result in results] == [chunks[0]]
+
+
+def test_tantivy_sparse_index_restores_legacy_payload_chunk_id(tmp_path: Path) -> None:
+    """Legacy LMDB payloads without chunk_id should still search with the Tantivy stable ID."""
+    chunk = make_chunk("def authenticate(token):\n    return token", "auth.py")
+    indexed_chunk = replace(chunk, chunk_id=10)
+    index_path = tmp_path / "tantivy"
+    store_path = tmp_path / "chunks.lmdb"
+    TantivySparseIndex.from_chunks([indexed_chunk], path=index_path)
+    store = LmdbChunkStore.open(store_path)
+    try:
+        with store.env.begin(write=True) as txn:
+            txn.put(_int_key(10), orjson.dumps(chunk.to_dict()), db=store.chunks_db)
+    finally:
+        store.close()
+
+    loaded = TantivySparseIndex.load_from_store(index_path, store_path)
+
+    assert loaded.search("authenticate token", top_k=1)[0].chunk.chunk_id == 10
 
 
 def test_tantivy_sparse_index_updates_changed_chunks_without_rebuild(tmp_path: Path) -> None:

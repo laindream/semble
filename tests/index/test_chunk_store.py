@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import orjson
+import pytest
 
 from semble.index.chunk_store import _CHUNK_PAYLOAD_V1, FileManifest, LmdbChunkStore, _int_key
 from semble.index.lazy_chunks import LazyChunkList
@@ -51,6 +52,23 @@ def test_lmdb_chunk_store_reads_chunks_by_stable_id(tmp_path: Path) -> None:
     assert loaded.get_chunks([9, 7]) == [chunks[1], chunks[0]]
     assert loaded.next_chunk_id() == 10
     loaded.close()
+
+
+def test_lmdb_chunk_store_get_chunks_fails_when_payload_is_missing(tmp_path: Path) -> None:
+    """Batch chunk reads should fail loudly instead of returning a misaligned shorter list."""
+    chunk = chunk_with_id("def authenticate(token):\n    return token", "auth.py", 7)
+    store = LmdbChunkStore.open(tmp_path / "chunks.lmdb")
+    try:
+        store.write_chunks([chunk])
+    finally:
+        store.close()
+
+    loaded = LmdbChunkStore.open(tmp_path / "chunks.lmdb", readonly=True)
+    try:
+        with pytest.raises(FileNotFoundError, match="payload for id 8"):
+            loaded.get_chunks([7, 8])
+    finally:
+        loaded.close()
 
 
 def test_lmdb_chunk_store_writes_explicit_ids_into_payload(tmp_path: Path) -> None:
